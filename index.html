@@ -1,0 +1,223 @@
+<body>
+
+
+<script src="http://code.jquery.com/jquery-1.11.3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.5/d3.min.js"></script>
+    
+    <script src="https://rawgit.com/gka/randomgraph.js/master/randomgraph.js"></script>
+
+    
+    
+<script>
+
+// using a the randomgraph js library to generate graph
+var graph = randomgraph.WattsStrogatz.beta(20, 4, 0.06)
+graph.links = graph.edges
+
+for(var i=0; i<graph.nodes.length;i++)
+  graph.nodes[i].weight = 1
+
+
+
+var dataContainer = null
+var node = null, link = null;
+var canvas = null
+var width = window.innerWidth,
+    height = window.innerHeight;
+
+var force = null
+var context = null
+
+// helper functions
+function getMousePos(canvas, evt) {
+        var rect = canvas.getBoundingClientRect();
+        return {
+          x: evt.clientX - rect.left,
+          y: evt.clientY - rect.top
+        };
+      }
+
+function removeNode(n, d)
+{
+     d.edges.forEach(function(l){
+        console.log(l)
+        link[0].splice(link[0].indexOf(l), 1)
+     })
+
+    node[0].splice(node[0].indexOf(n), 1)
+
+}
+
+
+$(document).ready(function(){
+
+
+ // create canvas
+ canvas = d3.select("body").append("canvas")
+    .attr("width", width)
+    .attr("height", height);
+
+// on click we wheck if we clicked on a node or not
+canvas.node().addEventListener('click', function(evt) {
+        var mousePos = getMousePos(canvas.node(), evt);
+        
+        
+        node.each(function(d) {
+
+          // radius to float
+          var xEdge = this.getAttribute('r') * 1.0
+          var yEdge = this.getAttribute('r') * 1.0
+
+
+          // check if clicked inside a node
+          if (   (d.x - xEdge) <= mousePos.x 
+              && (d.y - yEdge) <= mousePos.y
+              && mousePos.x    <= (d.x + xEdge)
+              && mousePos.y    <= (d.y + yEdge)) {
+            
+              console.log("Clicked node: " + i)
+
+              removeNode(this, d)
+
+              force.start()
+              return
+          }
+
+        });
+
+       
+      }, false);
+
+// initiate d3
+ force = d3.layout.force()
+    .size([width, height]);
+
+// default radius
+for (var i = 0; i < graph.nodes.length; i++)
+  graph.nodes[i].radius = 4.5
+
+
+// canvas context
+ context = canvas.node().getContext("2d");
+ context.imageSmoothingEnabled= true
+
+// dummy container for d3 elements which will change their attributes
+// to be then used when drawing in canvas
+// doing this to be able to use for example transitions
+var detachedContainer = document.createElement("custom");
+ dataContainer = d3.select(detachedContainer);
+
+
+  // attempts at fixing bugs in some devices
+  // start network after a few seconds
+setTimeout(function(){
+
+  force
+      .nodes(graph.nodes)
+      .links(graph.links)
+      .linkDistance(60)
+      .gravity(0.31)
+      .charge(-403)
+      .start();
+
+  
+  // initate d3 data
+  link = dataContainer.selectAll(".link").data(graph.links)
+              .enter().append("line").attr("class", "link")
+              .style("stroke-width", 2)
+
+
+  node = dataContainer.selectAll(".node").data(graph.nodes)
+              .enter().append("circle")
+              .attr("class", function (d){ return "node node_" + d.index;})
+              .attr("r", 5)
+              .attr("fill", 'red')
+              .attr("strokeStyle", 'black');
+
+    node.each(function(d) {
+        d.edges = []
+
+        link.each(function(ld) {
+          if ((ld.source && ld.source.index == d.index) 
+               || 
+              (ld.target && ld.target.index == d.index))
+          {
+              d.edges.push(this)
+            }
+        });
+    });
+
+    // instead of js native, this takes in consideration animation frame rate
+    d3.timer(tick);
+
+    // initiate a transition
+    node.transition().duration(5000).attr('r', 10).attr('fill', 'orange');
+
+}, 1000);
+
+
+  
+})
+
+
+var pi2 = 2 * Math.PI
+
+// draw tick
+function tick() {
+
+    // clear canvas via 2 methods
+    // first presumably better for android
+    canvas.style.opacity = 0.99;
+    setTimeout(function() {
+        canvas.style.opacity = 1;
+    });
+    context.clearRect(0, 0, width, height);
+
+
+    // draw links
+    link.each(function(d) {
+      context.beginPath();
+
+      context.moveTo(d.source.x, d.source.y);
+      context.lineTo(d.target.x, d.target.y);
+      
+      context.closePath();
+
+      context.strokeStyle = "#ccc";
+      context.stroke();
+    });
+
+
+    // draw nodes
+    // and keep them inside the frame of the canvas
+    context.lineWidth = 2;
+    node.each(function(d) {
+
+      context.beginPath();
+      context.moveTo(d.x, d.y);
+      var r = this.getAttribute('r');
+
+      
+
+      d.x = Math.max(30, Math.min(width - 30, d.x));
+      d.y = Math.max(30, Math.min(height - 30, d.y));
+
+      
+
+      context.arc(d.x, d.y, r, 0, pi2);
+      context.closePath();
+      context.fillStyle = this.getAttribute('fill');
+      context.strokeStyle = this.getAttribute('strokeStyle');
+
+
+      context.stroke();
+      context.fill();
+    });
+
+
+    
+  }
+
+</script>
+
+</body>
